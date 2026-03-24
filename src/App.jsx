@@ -7,6 +7,7 @@ import Transactions from './components/dashboard/Transactions'
 import Contracts from './components/dashboard/Contracts'
 import NetworkStats from './components/dashboard/NetworkStats'
 import Faucet from './components/dashboard/Faucet'
+import Builder from './components/dashboard/Builder'
 import { useStore } from './lib/store'
 
 const TABS = {
@@ -15,6 +16,7 @@ const TABS = {
   transactions: Transactions,
   contracts:    Contracts,
   network:      NetworkStats,
+  builder:      Builder,
   faucet:       Faucet,
 }
 
