@@ -1,13 +1,47 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useStore } from '../../lib/store'
 import { fetchNetworkStats, getServer } from '../../lib/stellar'
 import { format } from 'date-fns'
 import { StatCard } from './Card'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 export default function Network() {
   const { network, networkStats, setNetworkStats, statsLoading, setStatsLoading } = useStore()
   const [recentLedgers, setRecentLedgers] = useState([])
   const [ledgersLoading, setLedgersLoading] = useState(false)
+
+  // Calculate ledger close intervals for chart
+  const chartData = useMemo(() => {
+    if (recentLedgers.length < 2) return []
+    
+    // Sort ledgers by sequence (ascending for chart)
+    const sortedLedgers = [...recentLedgers].sort((a, b) => a.sequence - b.sequence)
+    
+    const data = []
+    for (let i = 1; i < sortedLedgers.length; i++) {
+      const current = sortedLedgers[i]
+      const previous = sortedLedgers[i - 1]
+      
+      const currentTime = new Date(current.closed_at).getTime()
+      const previousTime = new Date(previous.closed_at).getTime()
+      const interval = (currentTime - previousTime) / 1000 // Convert to seconds
+      
+      data.push({
+        sequence: current.sequence,
+        interval: interval,
+        formattedSequence: current.sequence.toLocaleString()
+      })
+    }
+    
+    return data
+  }, [recentLedgers])
+
+  // Calculate average close time for reference line
+  const averageCloseTime = useMemo(() => {
+    if (chartData.length === 0) return 0
+    const sum = chartData.reduce((acc, item) => acc + item.interval, 0)
+    return sum / chartData.length
+  }, [chartData])
 
   useEffect(() => {
     setStatsLoading(true)
@@ -18,7 +52,7 @@ export default function Network() {
       .catch(() => {})
       .finally(() => setStatsLoading(false))
 
-    getServer(network).ledgers().order('desc').limit(10).call()
+    getServer(network).ledgers().order('desc').limit(20).call()
       .then(r => setRecentLedgers(r.records))
       .catch(() => {})
       .finally(() => setLedgersLoading(false))
@@ -70,6 +104,65 @@ export default function Network() {
         </div>
       )}
 
+      {/* Ledger Close Time Chart */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>
+          Ledger Close Times
+          <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>
+            (Last {chartData.length} ledgers)
+          </span>
+        </div>
+        {ledgersLoading ? (
+          <div style={{ padding: '32px', display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
+        ) : chartData.length > 0 ? (
+          <div style={{ padding: '18px', height: '280px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis 
+                  dataKey="sequence"
+                  tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                  label={{ value: 'Seconds', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '11px', fill: 'var(--text-muted)' } }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: 'var(--bg-card)', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: 'var(--radius)', 
+                    fontSize: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  formatter={(value) => [`${value.toFixed(2)}s`, 'Close Time']}
+                  labelFormatter={(label) => `Ledger ${label.toLocaleString()}`}
+                />
+                <ReferenceLine 
+                  y={averageCloseTime} 
+                  stroke="var(--amber)" 
+                  strokeDasharray="5 5" 
+                  label={{ value: `Avg: ${averageCloseTime.toFixed(2)}s`, position: 'topRight', fontSize: 11, fill: 'var(--amber)' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="interval" 
+                  stroke="var(--cyan)" 
+                  strokeWidth={2}
+                  dot={{ fill: 'var(--cyan)', strokeWidth: 2, r: 3 }}
+                  activeDot={{ r: 5, stroke: 'var(--cyan)', strokeWidth: 2, fill: 'var(--bg-card)' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+            No data available
+          </div>
+        )}
+      </div>
+
       {/* Recent Ledgers */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '13px' }}>Recent Ledgers</div>
@@ -80,13 +173,13 @@ export default function Network() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', padding: '8px 18px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid var(--border)' }}>
               <span>Sequence</span><span>Tx</span><span>Ops</span><span>Closed</span>
             </div>
-            {recentLedgers.map((l, i) => (
+            {recentLedgers.slice(0, 10).map((l, i) => (
               <div key={l.id} style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr 1fr 1fr',
                 padding: '10px 18px',
                 fontSize: '12px',
-                borderBottom: i < recentLedgers.length - 1 ? '1px solid var(--border)' : 'none',
+                borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
                 transition: 'var(--transition)',
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
