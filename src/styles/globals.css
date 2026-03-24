@@ -98,6 +98,14 @@ body::before {
   50%       { opacity: 0; }
 }
 
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pulse { animation: pulse 2s infinite ease-in-out; }
+
 .animate-in { animation: fadeIn 0.35s ease both; }
 .animate-in-delay-1 { animation: fadeIn 0.35s 0.05s ease both; }
 .animate-in-delay-2 { animation: fadeIn 0.35s 0.1s ease both; }

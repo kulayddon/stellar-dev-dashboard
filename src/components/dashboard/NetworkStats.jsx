@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useStore } from '../../lib/store'
-import { fetchNetworkStats, getServer } from '../../lib/stellar'
+import { fetchNetworkStats, getServer, streamLedgers } from '../../lib/stellar'
 import { format } from 'date-fns'
 import { StatCard } from './Card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -9,30 +9,31 @@ export default function Network() {
   const { network, networkStats, setNetworkStats, statsLoading, setStatsLoading } = useStore()
   const [recentLedgers, setRecentLedgers] = useState([])
   const [ledgersLoading, setLedgersLoading] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
 
   // Calculate ledger close intervals for chart
   const chartData = useMemo(() => {
     if (recentLedgers.length < 2) return []
-    
+
     // Sort ledgers by sequence (ascending for chart)
     const sortedLedgers = [...recentLedgers].sort((a, b) => a.sequence - b.sequence)
-    
+
     const data = []
     for (let i = 1; i < sortedLedgers.length; i++) {
       const current = sortedLedgers[i]
       const previous = sortedLedgers[i - 1]
-      
+
       const currentTime = new Date(current.closed_at).getTime()
       const previousTime = new Date(previous.closed_at).getTime()
       const interval = (currentTime - previousTime) / 1000 // Convert to seconds
-      
+
       data.push({
         sequence: current.sequence,
         interval: interval,
         formattedSequence: current.sequence.toLocaleString()
       })
     }
-    
+
     return data
   }, [recentLedgers])
 
@@ -47,23 +48,76 @@ export default function Network() {
     setStatsLoading(true)
     setLedgersLoading(true)
 
+    // Initial fetch
     fetchNetworkStats(network)
       .then(s => setNetworkStats(s))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setStatsLoading(false))
 
     getServer(network).ledgers().order('desc').limit(20).call()
       .then(r => setRecentLedgers(r.records))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLedgersLoading(false))
-  }, [network])
+
+    // Set up streaming
+    let closeStream = null
+    try {
+      closeStream = streamLedgers((newLedger) => {
+        setIsStreaming(true)
+        setRecentLedgers(prev => {
+          if (prev.some(l => l.sequence === newLedger.sequence)) return prev
+          return [newLedger, ...prev.slice(0, 19)]
+        })
+
+        // Update latest ledger immediately for instant UI feedback
+        setNetworkStats(prev => ({
+          ...prev,
+          latestLedger: newLedger
+        }))
+
+        // Refresh full stats to ensure fee stats and other data stay current
+        fetchNetworkStats(network)
+          .then(s => setNetworkStats(s))
+          .catch(() => { })
+      }, network)
+    } catch (e) {
+      console.error('Streaming failed:', e)
+      setIsStreaming(false)
+    }
+
+    return () => {
+      if (closeStream) closeStream()
+      setIsStreaming(false)
+    }
+  }, [network, setNetworkStats, setStatsLoading])
 
   const ledger = networkStats?.latestLedger
   const fee = networkStats?.feeStats
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700 }}>Network</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700 }}>Network</div>
+        {isStreaming && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 10px',
+            borderRadius: '20px',
+            background: 'rgba(0, 230, 118, 0.1)',
+            border: '1px solid rgba(0, 230, 118, 0.2)',
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'var(--green)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px'
+          }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 8px var(--green)' }} className="pulse" />
+            Live
+          </div>
+        )}
+      </div>
 
       {/* Key stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -119,36 +173,36 @@ export default function Network() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis 
+                <XAxis
                   dataKey="sequence"
                   tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                   tickFormatter={(value) => value.toLocaleString()}
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                   label={{ value: 'Seconds', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '11px', fill: 'var(--text-muted)' } }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    background: 'var(--bg-card)', 
-                    border: '1px solid var(--border)', 
-                    borderRadius: 'var(--radius)', 
+                <Tooltip
+                  contentStyle={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                   }}
                   formatter={(value) => [`${value.toFixed(2)}s`, 'Close Time']}
                   labelFormatter={(label) => `Ledger ${label.toLocaleString()}`}
                 />
-                <ReferenceLine 
-                  y={averageCloseTime} 
-                  stroke="var(--amber)" 
-                  strokeDasharray="5 5" 
+                <ReferenceLine
+                  y={averageCloseTime}
+                  stroke="var(--amber)"
+                  strokeDasharray="5 5"
                   label={{ value: `Avg: ${averageCloseTime.toFixed(2)}s`, position: 'topRight', fontSize: 11, fill: 'var(--amber)' }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="interval" 
-                  stroke="var(--cyan)" 
+                <Line
+                  type="monotone"
+                  dataKey="interval"
+                  stroke="var(--cyan)"
                   strokeWidth={2}
                   dot={{ fill: 'var(--cyan)', strokeWidth: 2, r: 3 }}
                   activeDot={{ r: 5, stroke: 'var(--cyan)', strokeWidth: 2, fill: 'var(--bg-card)' }}
@@ -182,8 +236,8 @@ export default function Network() {
                 borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
                 transition: 'var(--transition)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{l.sequence.toLocaleString()}</span>
                 <span style={{ color: 'var(--text-secondary)' }}>{l.successful_transaction_count}</span>

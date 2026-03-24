@@ -63,6 +63,17 @@ export async function fetchNetworkStats(network = 'testnet') {
   }
 }
 
+export function streamLedgers(callback, network = 'testnet') {
+  const server = getServer(network)
+  return server
+    .ledgers()
+    .cursor('now')
+    .stream({
+      onmessage: (ledger) => callback(ledger),
+      onerror: (error) => console.error('Ledger stream error:', error),
+    })
+}
+
 export async function fundTestnetAccount(publicKey) {
   const res = await fetch(
     `${NETWORKS.testnet.faucetUrl}?addr=${publicKey}`
@@ -113,7 +124,7 @@ export function shortAddress(addr, chars = 6) {
 export async function buildTransaction({ sourceAccount, operations, memo, baseFee, timeBounds, network }) {
   const server = getServer(network)
   const account = await server.loadAccount(sourceAccount)
-  
+
   const txBuilder = new StellarSdk.TransactionBuilder(account, {
     fee: baseFee.toString(),
     networkPassphrase: NETWORKS[network].passphrase,
@@ -153,10 +164,10 @@ export async function buildTransaction({ sourceAccount, operations, memo, baseFe
 export async function simulateTransaction(params) {
   try {
     const transaction = await buildTransaction(params)
-    
+
     // For simulation, we'll validate the transaction structure and estimate fees
     // In a real implementation, you might use Soroban RPC for more detailed simulation
-    
+
     // Basic validation
     if (!isValidPublicKey(params.sourceAccount)) {
       throw new Error('Invalid source account')

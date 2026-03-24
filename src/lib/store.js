@@ -34,7 +34,9 @@ export const useStore = create((set, get) => ({
   // Network stats
   networkStats: null,
   statsLoading: false,
-  setNetworkStats: (stats) => set({ networkStats: stats }),
+  setNetworkStats: (stats) => set((state) => ({
+    networkStats: typeof stats === 'function' ? stats(state.networkStats) : stats
+  })),
   setStatsLoading: (v) => set({ statsLoading: v }),
 
   // Active tab
