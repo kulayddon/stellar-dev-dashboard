@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { useStore } from '../../lib/store'
 import { fetchNetworkStats, formatXLM, shortAddress } from '../../lib/stellar'
 import { StatCard } from './Card'
+import CopyableValue from './CopyableValue'
 import { format } from 'date-fns'
 
 export default function Overview() {
@@ -33,9 +34,14 @@ export default function Overview() {
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700 }}>
             Overview
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+          <CopyableValue
+            value={connectedAddress}
+            title="Copy connected public key"
+            containerStyle={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}
+            textStyle={{ maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
             {shortAddress(connectedAddress, 8)}
-          </div>
+          </CopyableValue>
         </div>
         <div style={{
           padding: '6px 12px',
@@ -108,9 +114,14 @@ export default function Overview() {
                     {asset.asset_code || asset.asset_type}
                   </span>
                   {asset.asset_issuer && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px' }}>
+                    <CopyableValue
+                      value={asset.asset_issuer}
+                      title="Copy asset issuer public key"
+                      containerStyle={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px', fontFamily: 'var(--font-mono)' }}
+                      textStyle={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
                       {shortAddress(asset.asset_issuer)}
-                    </span>
+                    </CopyableValue>
                   )}
                 </div>
                 <span style={{ color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>
@@ -155,9 +166,14 @@ export default function Overview() {
               flexShrink: 0,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }} className="truncate">
+              <CopyableValue
+                value={tx.hash}
+                title="Copy transaction hash"
+                containerStyle={{ fontSize: '12px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', maxWidth: '100%', flex: 1, minWidth: 0 }}
+                textStyle={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
                 {tx.hash}
-              </div>
+              </CopyableValue>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {tx.operation_count} op{tx.operation_count !== 1 ? 's' : ''} · {format(new Date(tx.created_at), 'MMM d, HH:mm')}
               </div>

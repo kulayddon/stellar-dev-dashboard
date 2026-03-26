@@ -1,5 +1,6 @@
 import React from 'react'
 import { useStore } from '../../lib/store'
+import CopyableValue from '../dashboard/CopyableValue'
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: '◈' },
@@ -148,7 +149,13 @@ export default function Sidebar() {
             Connected
           </div>
           <div style={{ wordBreak: 'break-all', lineHeight: 1.4 }}>
-            {connectedAddress.slice(0, 8)}…{connectedAddress.slice(-8)}
+            <CopyableValue
+              value={connectedAddress}
+              title="Copy connected public key"
+              textStyle={{ display: 'inline-block' }}
+            >
+              {connectedAddress.slice(0, 8)}…{connectedAddress.slice(-8)}
+            </CopyableValue>
           </div>
         </div>
       )}

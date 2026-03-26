@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useStore } from '../../lib/store'
-import { shortAddress } from '../../lib/stellar'
+import { shortAddress, getOperationLabel } from '../../lib/stellar'
+import CopyableValue from './CopyableValue'
 import { format } from 'date-fns'
 
 export default function Transactions() {
@@ -60,13 +61,21 @@ export default function Transactions() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                   <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: tx.successful ? 'var(--green)' : 'var(--red)', flexShrink: 0, display: 'inline-block' }} />
+                  <CopyableValue
+                    value={tx.hash}
+                    title="Copy transaction hash"
+                    containerStyle={{ fontSize: '12px', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', minWidth: 0, flex: 1 }}
+                    textStyle={{ display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}
+                  >
+                    {tx.hash}
+                  </CopyableValue>
                   <a
                     href={`https://stellar.expert/explorer/${network}/tx/${tx.hash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: '12px', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    style={{ fontSize: '11px', color: 'var(--cyan)', flexShrink: 0 }}
                   >
-                    {tx.hash}
+                    ↗
                   </a>
                 </div>
                 {tx.memo && (
@@ -126,11 +135,19 @@ export default function Transactions() {
                     marginRight: '8px',
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {op.type.replace(/_/g, ' ')}
+                    {getOperationLabel(op.type)}
                   </span>
                 </div>
-                {op.from && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>from: {shortAddress(op.from)}</div>}
-                {op.to && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>to: {shortAddress(op.to)}</div>}
+                {op.from && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    from: <CopyableValue value={op.from} title="Copy source public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{shortAddress(op.from)}</CopyableValue>
+                  </div>
+                )}
+                {op.to && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    to: <CopyableValue value={op.to} title="Copy destination public key" textStyle={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{shortAddress(op.to)}</CopyableValue>
+                  </div>
+                )}
                 {op.amount && (
                   <div style={{ fontSize: '11px', color: 'var(--amber)' }}>
                     {parseFloat(op.amount).toFixed(4)} {op.asset_code || 'XLM'}
